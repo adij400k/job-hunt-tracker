@@ -1,0 +1,3 @@
+# secrets and build output must never go to GitHub
+config.properties
+target/

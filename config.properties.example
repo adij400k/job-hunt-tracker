@@ -1,0 +1,16 @@
+# Copy this file to config.properties (next to pom.xml) and fill in your own values.
+# config.properties is in .gitignore. Never upload it.
+# No spaces around the = sign, and the key names must stay exactly as they are.
+
+# Adzuna API keys (from the Adzuna developer site)
+adzuna.app_id=YOUR_ADZUNA_APP_ID
+adzuna.app_key=YOUR_ADZUNA_APP_KEY
+
+# MySQL
+hibernate.db.url=jdbc:mysql://localhost:3306/jobtracker_h?allowPublicKeyRetrieval=true&useSSL=false
+db.user=root
+db.password=YOUR_MYSQL_PASSWORD
+
+# The admin account, created once at startup
+admin.username=admin
+admin.password=CHOOSE_A_STRONG_PASSWORD

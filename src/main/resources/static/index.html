@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Job Hunt Tracker</title>
+
+  <!-- Set the saved theme (light or dark) before the page is drawn, so it does not flash -->
+  <script>
+    try {
+      const saved = localStorage.getItem("theme");
+      const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.dataset.theme = saved || (dark ? "dark" : "light");
+    } catch (e) { document.documentElement.dataset.theme = "light"; }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="top">
+    <h1><span class="mark" aria-hidden="true"></span>Job Hunt Tracker</h1>
+    <div class="top-right">
+      <button id="themeBtn" class="small light" type="button">Dark mode</button>
+      <!-- "hidden" = not shown. JavaScript shows it after login. -->
+      <div id="userBox" hidden>
+        <span id="userText"></span>
+        <button id="logoutBtn" class="small light" type="button">Log out</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ===== LOGIN VIEW (shown first) ===== -->
+    <section id="loginView" class="card narrow lift">
+      <h2>Welcome back</h2>
+      <p class="hint">Keep every job and application in one place.</p>
+      <form id="loginForm">
+        <label for="username">Username</label>
+        <input id="username" type="text" autocomplete="username" required>
+
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+
+        <div class="row">
+          <button type="submit">Log in</button>
+          <button id="registerBtn" class="ghost" type="button">Create account</button>
+        </div>
+      </form>
+      <p id="loginMessage" class="message" role="alert"></p>
+    </section>
+
+    <!-- ===== APP VIEW (shown after login) ===== -->
+    <section id="appView" hidden>
+
+      <!-- Status summary: one box per status, and a bar showing their share -->
+      <div id="summaryBoxes" class="summary"></div>
+      <div id="summaryBar" class="pipe" aria-hidden="true"></div>
+
+      <!-- Tabs -->
+      <nav class="tabs" role="tablist">
+        <button class="tab active" role="tab" aria-selected="true" data-tab="jobs" type="button">My jobs</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="add" type="button">Add a job</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="fetch" type="button">Fetch jobs</button>
+        <button id="tabWatcher" class="tab" role="tab" aria-selected="false" data-tab="watcher" type="button" hidden>Watcher</button>
+      </nav>
+
+      <!-- ===== TAB: My jobs ===== -->
+      <section id="panel-jobs" class="panel">
+        <div class="toolbar">
+          <h2><span id="listTitle">My jobs</span> <span id="jobCount" class="count"></span></h2>
+          <button id="refreshBtn" class="small ghost" type="button">Refresh</button>
+        </div>
+
+        <!-- Filter by status (done in the browser) and sort -->
+        <div class="controls">
+          <div id="filters" class="filters" role="group" aria-label="Filter by status">
+            <button type="button" data-filter="ALL" aria-pressed="true">All</button>
+            <button type="button" data-filter="NONE" aria-pressed="false">Not applied</button>
+            <button type="button" data-filter="APPLIED" aria-pressed="false">Applied</button>
+            <button type="button" data-filter="INTERVIEW" aria-pressed="false">Interview</button>
+            <button type="button" data-filter="OFFER" aria-pressed="false">Offer</button>
+            <button type="button" data-filter="REJECTED" aria-pressed="false">Rejected</button>
+          </div>
+          <div class="sort">
+            <label for="sortSelect">Sort by</label>
+            <select id="sortSelect">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="title">Title A to Z</option>
+              <option value="company">Company A to Z</option>
+              <option value="salary">Highest salary</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Search by skill (done by the server) -->
+        <form id="searchForm" class="search">
+          <input id="skillSearch" type="text" placeholder="Search by skill, for example Java" aria-label="Search by skill">
+          <button class="small" type="submit">Search</button>
+          <button id="showAllBtn" class="small ghost" type="button">Show all</button>
+        </form>
+
+        <!-- Shown when there is nothing to list -->
+        <div id="emptyState" class="empty-state" hidden>
+          <p id="emptyText"></p>
+          <div id="emptyActions" class="row">
+            <button class="small" type="button" data-goto="add">Add a job</button>
+            <button class="small ghost" type="button" data-goto="fetch">Fetch from Adzuna</button>
+          </div>
+        </div>
+
+        <!-- On a phone the table rows turn into cards (see style.css) -->
+        <div id="tableWrap" class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Company</th>
+                <th>Location</th>
+                <th>Salary</th>
+                <th>Skills</th>
+                <th>Status</th>
+                <th>Link</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="jobRows"></tbody>
+          </table>
+        </div>
+
+        <!-- Notes panel: opens when you press "Notes" on a job -->
+        <section id="notesPanel" class="card notes" hidden>
+          <div class="toolbar">
+            <h2 id="notesTitle">Notes</h2>
+            <button id="notesCloseBtn" class="small ghost" type="button">Close</button>
+          </div>
+          <ul id="notesList" class="notes-list"></ul>
+          <form id="noteForm">
+            <label for="noteText">New note (one note per job per day)</label>
+            <input id="noteText" type="text" maxlength="1000" placeholder="HR will call on Monday" required>
+            <div class="row">
+              <button type="submit">Save note</button>
+            </div>
+          </form>
+        </section>
+      </section>
+
+      <!-- ===== TAB: Add a job ===== -->
+      <section id="panel-add" class="panel card" hidden>
+        <h2>Add a job</h2>
+        <form id="addJobForm" class="grid">
+          <div>
+            <label for="jobType">Type</label>
+            <select id="jobType">
+              <option value="FULL-TIME">Full-time</option>
+              <option value="INTERNSHIP">Internship</option>
+            </select>
+          </div>
+          <div>
+            <label for="jobTitle">Title</label>
+            <input id="jobTitle" type="text" required>
+          </div>
+          <div>
+            <label for="jobCompany">Company</label>
+            <input id="jobCompany" type="text" required>
+          </div>
+          <div>
+            <label for="jobLocation">Location</label>
+            <input id="jobLocation" type="text" required>
+          </div>
+          <div>
+            <label for="jobSalary">Yearly salary or stipend (optional)</label>
+            <input id="jobSalary" type="number" min="0">
+          </div>
+          <div id="yearsBox">
+            <label for="jobYears">Years of experience needed</label>
+            <input id="jobYears" type="number" min="0" value="0">
+          </div>
+          <div id="monthsBox" hidden>
+            <label for="jobMonths">Duration in months</label>
+            <input id="jobMonths" type="number" min="0" value="0">
+          </div>
+          <div>
+            <label for="jobLink">Apply link (optional)</label>
+            <input id="jobLink" type="url" placeholder="https://...">
+          </div>
+          <div class="full">
+            <button type="submit">Save job</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ===== TAB: Fetch jobs ===== -->
+      <section id="panel-fetch" class="panel card" hidden>
+        <h2>Fetch jobs from Adzuna</h2>
+        <p class="hint">New jobs are saved to your list. Jobs you already have are skipped.</p>
+        <form id="fetchForm" class="grid">
+          <div>
+            <label for="fetchWhat">Job title or skill</label>
+            <input id="fetchWhat" type="text" placeholder="java developer" required>
+          </div>
+          <div>
+            <label for="fetchWhere">City</label>
+            <input id="fetchWhere" type="text" placeholder="mumbai">
+          </div>
+          <div class="full">
+            <button id="fetchBtn" type="submit">Fetch jobs</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ===== TAB: Watcher (the tab button is shown to ADMIN only) ===== -->
+      <section id="panel-watcher" class="panel card" hidden>
+        <h2>Job watcher</h2>
+        <p class="hint">Checks Adzuna by itself every few minutes, in a background thread, and saves new jobs to your list.</p>
+        <form id="watcherForm" class="grid">
+          <div>
+            <label for="watchWhat">Job title or skill</label>
+            <input id="watchWhat" type="text" placeholder="java developer" required>
+          </div>
+          <div>
+            <label for="watchWhere">City</label>
+            <input id="watchWhere" type="text" placeholder="mumbai">
+          </div>
+          <div>
+            <label for="watchMinutes">Check every (minutes)</label>
+            <input id="watchMinutes" type="number" min="1" value="5" required>
+          </div>
+          <div class="full row">
+            <button type="submit">Start watcher</button>
+            <button id="watchStopBtn" class="ghost" type="button">Stop watcher</button>
+            <button id="watchStatusBtn" class="ghost" type="button">Check status</button>
+          </div>
+        </form>
+        <p id="watcherStatus" class="status-line off"></p>
+      </section>
+
+    </section>
+  </main>
+
+    <footer class="footer">
+    <p>Built by Aditya Maurya, Java full stack developer, Mumbai.</p>
+    <p>
+      <a href="mailto:aditya.maurya0603@gmail.com">Mail</a>
+      <a href="https://www.linkedin.com/in/404aditya " target="_blank" rel="noopener noreferrer">LinkedIn</a>
+      <a href="https://github.com/adij400k" target="_blank" rel="noopener noreferrer">GitHub</a>
+    </p>
+  </footer>
+
+  <!-- One pop-up box used for "Add skills" and "Delete" -->
+  <dialog id="dlg">
+    <form method="dialog">
+      <h2 id="dlgTitle"></h2>
+      <p id="dlgText"></p>
+      <input id="dlgInput" type="text" hidden aria-label="Value">
+      <div class="row end">
+        <button id="dlgCancel" class="ghost" type="button">Cancel</button>
+        <button id="dlgOk" type="submit" value="ok">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Small messages appear here for a few seconds -->
+  <div id="toasts" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
